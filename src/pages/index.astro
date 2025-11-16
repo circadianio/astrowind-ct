@@ -1,120 +1,180 @@
 ---
 import { Fragment } from 'astro/jsx-runtime';
-import Layout from '~/layouts/PageLayout.astro';
 
+import Layout from '~/layouts/PageLayout.astro';
 import Hero from '~/components/widgets/Hero.astro';
 import Features from '~/components/widgets/Features.astro';
 import CallToAction from '~/components/widgets/CallToAction.astro';
 
-import { getPageBySlug, getSectionsForPage } from '../lib/directus';
+import {
+  getPageBySlug,
+  getSectionsForPage,
+  type Section,
+} from '../lib/directus';
 
 const slug = 'home';
 
+// Main page record (title, default hero text, default body)
 const page = await getPageBySlug(slug);
-if (!page) {
-  throw new Error('Home page with slug "home" not found in Directus.');
-}
 
-const sections = await getSectionsForPage(slug);
+// All sections for this page, sorted by "sort" in Directus
+const sections: Section[] = await getSectionsForPage(slug);
 
 const metadata = {
-  title: page.title ?? 'Circadian',
+  title: page?.title ?? 'Untitled page',
   ignoreTitleTemplate: true,
 };
 ---
 
 <Layout metadata={metadata}>
-  {sections.map((section) => {
-    switch (section.layout_type) {
-      case 'hero': {
-        const title = section.title ?? page.title;
-        const subtitle = section.subtitle ?? page.hero_text ?? '';
-        return (
-          <Hero
-            actions={[]}
-            image={{
-              src: '~/assets/images/hero-image.png',
-              alt: section.image_alt ?? 'Hero image',
-            }}
-          >
-            <Fragment slot="title">
-              {title}
-            </Fragment>
+  {sections.length === 0 ? (
+    // Fallback: no sections configured yet, render a very simple page
+    <>
+      <Hero actions={[]} image={{ src: '~/assets/images/hero-image.png', alt: 'Hero image' }}>
+        <Fragment slot="title">
+          {page?.title ?? 'Untitled page'}
+        </Fragment>
 
-            <Fragment slot="subtitle">
-              {subtitle}
-            </Fragment>
-          </Hero>
-        );
-      }
+        {page?.hero_text && (
+          <Fragment slot="subtitle">
+            {page.hero_text}
+          </Fragment>
+        )}
+      </Hero>
 
-      case 'text': {
-        return (
-          <section class="py-12 sm:py-16 lg:py-20">
-            <div class="layout">
-              {section.title && (
-                <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-4">
-                  {section.title}
-                </h2>
+      {(page?.body ?? '').trim() && (
+        <section class="py-12 sm:py-16 lg:py-20">
+          <div class="layout">
+            <article
+              class="prose prose-lg max-w-none dark:prose-invert"
+              set:html={page.body}
+            />
+          </div>
+        </section>
+      )}
+    </>
+  ) : (
+    sections.map((section) => {
+      switch (section.layout_type) {
+        case 'hero': {
+          const title = section.title ?? page?.title ?? '';
+          const subtitle = section.subtitle ?? page?.hero_text ?? '';
+
+          // If there is literally nothing to show, skip this section
+          if (!title && !subtitle) return null;
+
+          return (
+            <Hero
+              actions={[]}
+              image={{
+                src: '~/assets/images/hero-image.png',
+                alt: section.image_alt ?? 'Hero image',
+              }}
+            >
+              <Fragment slot="title">
+                {title || 'Untitled section'}
+              </Fragment>
+
+              {subtitle && (
+                <Fragment slot="subtitle">
+                  {subtitle}
+                </Fragment>
+              )}
+            </Hero>
+          );
+        }
+
+        case 'text': {
+          const title = section.title ?? '';
+          const body = section.body ?? page?.body ?? '';
+
+          if (!title && !body) return null;
+
+          return (
+            <section
+              id={section.anchor_id ?? undefined}
+              class="py-12 sm:py-16 lg:py-20"
+            >
+              <div class="layout">
+                {title && (
+                  <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-4">
+                    {title}
+                  </h2>
+                )}
+
+                {body && (
+                  <article
+                    class="prose prose-lg max-w-none dark:prose-invert"
+                    set:html={body}
+                  />
+                )}
+              </div>
+            </section>
+          );
+        }
+
+        case 'features': {
+          const items = section.feature_items ?? [];
+          const hasContent =
+            (section.title && section.title.trim() !== '') ||
+            (section.subtitle && section.subtitle.trim() !== '') ||
+            items.length > 0;
+
+          if (!hasContent) return null;
+
+          return (
+            <Features
+              id={section.anchor_id ?? undefined}
+              tagline={section.tagline ?? undefined}
+              title={section.title ?? ''}
+              subtitle={section.subtitle ?? ''}
+              items={items}
+            />
+          );
+        }
+
+        case 'cta': {
+          const title = section.title ?? '';
+          const subtitle = section.subtitle ?? '';
+          const primaryLabel = section.primary_action_label ?? '';
+          const primaryHref = section.primary_action_href ?? '#';
+
+          if (!title && !subtitle && !primaryLabel) return null;
+
+          return (
+            <CallToAction
+              actions={
+                primaryLabel
+                  ? [
+                      {
+                        variant: 'primary',
+                        text: primaryLabel,
+                        href: primaryHref,
+                        icon: 'tabler:mail',
+                      },
+                    ]
+                  : []
+              }
+            >
+              {title && (
+                <Fragment slot="title">
+                  {title}
+                </Fragment>
               )}
 
-              <article
-                class="prose prose-lg max-w-none dark:prose-invert"
-                set:html={section.body ?? page.body ?? ''}
-              />
-            </div>
-          </section>
-        );
+              {subtitle && (
+                <Fragment slot="subtitle">
+                  {subtitle}
+                </Fragment>
+              )}
+            </CallToAction>
+          );
+        }
+
+        default:
+          // Unknown / unsupported layout_type: ignore
+          return null;
       }
-
-      case 'features': {
-        const items = section.feature_items ?? [];
-        return (
-          <Features
-            id={section.anchor_id ?? undefined}
-            tagline={section.tagline ?? undefined}
-            title={section.title ?? ''}
-            subtitle={section.subtitle ?? ''}
-            items={items}
-          />
-        );
-      }
-
-      case 'cta': {
-        const title = section.title ?? '';
-        const subtitle = section.subtitle ?? '';
-        const primaryLabel = section.primary_action_label ?? '';
-        const primaryHref = section.primary_action_href ?? '#';
-
-        return (
-          <CallToAction
-            actions={
-              primaryLabel
-                ? [
-                    {
-                      variant: 'primary',
-                      text: primaryLabel,
-                      href: primaryHref,
-                      icon: 'tabler:mail',
-                    },
-                  ]
-                : []
-            }
-          >
-            <Fragment slot="title">
-              {title}
-            </Fragment>
-
-            <Fragment slot="subtitle">
-              {subtitle}
-            </Fragment>
-          </CallToAction>
-        );
-      }
-
-      default:
-        // Unknown layout_type: skip silently
-        return null;
-    }
-  })}
+    })
+  )}
 </Layout>
