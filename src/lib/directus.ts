@@ -1,4 +1,5 @@
-const DIRECTUS_URL = import.meta.env.DIRECTUS_URL;
+const DIRECTUS_URL =
+  import.meta.env.DIRECTUS_URL ?? 'https://directus-production-89bd.up.railway.app';
 
 if (!DIRECTUS_URL) {
   console.warn("DIRECTUS_URL is not set. Directus helpers will return empty data.");
