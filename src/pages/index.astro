@@ -1,193 +1,120 @@
 ---
 import { Fragment } from 'astro/jsx-runtime';
-import { getPageBySlug } from "../lib/directus";
-
 import Layout from '~/layouts/PageLayout.astro';
 
 import Hero from '~/components/widgets/Hero.astro';
-import Note from '~/components/widgets/Note.astro';
 import Features from '~/components/widgets/Features.astro';
-import Features2 from '~/components/widgets/Features2.astro';
-import Steps from '~/components/widgets/Steps.astro';
-import Content from '~/components/widgets/Content.astro';
-import BlogLatestPosts from '~/components/widgets/BlogLatestPosts.astro';
-import FAQs from '~/components/widgets/FAQs.astro';
-import Stats from '~/components/widgets/Stats.astro';
 import CallToAction from '~/components/widgets/CallToAction.astro';
 
-// Fetch page from Directus
-const page = await getPageBySlug("home");
+import { getPageBySlug, getSectionsForPage } from '../lib/directus';
 
-// Fallback values if Directus is empty
-const heroTitle = page?.title ?? "Circadian";
-const heroSub =
-  page?.hero_text ?? "Energy & telemetry infrastructure designed for harsh environments.";
+const slug = 'home';
+
+const page = await getPageBySlug(slug);
+if (!page) {
+  throw new Error('Home page with slug "home" not found in Directus.');
+}
+
+const sections = await getSectionsForPage(slug);
 
 const metadata = {
-  title: heroTitle,
+  title: page.title ?? 'Circadian',
   ignoreTitleTemplate: true,
 };
 ---
 
 <Layout metadata={metadata}>
-  <!-- Hero Widget ******************* -->
+  {sections.map((section) => {
+    switch (section.layout_type) {
+      case 'hero': {
+        const title = section.title ?? page.title;
+        const subtitle = section.subtitle ?? page.hero_text ?? '';
+        return (
+          <Hero
+            actions={[]}
+            image={{
+              src: '~/assets/images/hero-image.png',
+              alt: section.image_alt ?? 'Hero image',
+            }}
+          >
+            <Fragment slot="title">
+              {title}
+            </Fragment>
 
-  <Hero
-    actions={[
-      {
-        variant: 'primary',
-        text: 'Get in touch',
-        href: '#contact',
-        icon: 'tabler:mail',
-      },
-      { text: 'Learn more', href: '#features' },
-    ]}
-    image={{ src: '~/assets/images/hero-image.png', alt: 'Circadian Hero Image' }}
-  >
-    <Fragment slot="title">
-      {heroTitle}
-    </Fragment>
+            <Fragment slot="subtitle">
+              {subtitle}
+            </Fragment>
+          </Hero>
+        );
+      }
 
-    <Fragment slot="subtitle">
-      {heroSub}
-    </Fragment>
-  </Hero>
+      case 'text': {
+        return (
+          <section class="py-12 sm:py-16 lg:py-20">
+            <div class="layout">
+              {section.title && (
+                <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-4">
+                  {section.title}
+                </h2>
+              )}
 
-  <!-- Note Widget ******************* -->
+              <article
+                class="prose prose-lg max-w-none dark:prose-invert"
+                set:html={section.body ?? page.body ?? ''}
+              />
+            </div>
+          </section>
+        );
+      }
 
-  <Note title="Philosophy:" description="Simplicity, reliability and field-proven deployments." />
+      case 'features': {
+        const items = section.feature_items ?? [];
+        return (
+          <Features
+            id={section.anchor_id ?? undefined}
+            tagline={section.tagline ?? undefined}
+            title={section.title ?? ''}
+            subtitle={section.subtitle ?? ''}
+            items={items}
+          />
+        );
+      }
 
-  <!-- Features Widget *************** -->
+      case 'cta': {
+        const title = section.title ?? '';
+        const subtitle = section.subtitle ?? '';
+        const primaryLabel = section.primary_action_label ?? '';
+        const primaryHref = section.primary_action_href ?? '#';
 
-  <Features
-    id="features"
-    tagline="What we do"
-    title="Energy & telemetry that actually works in the field"
-    subtitle="Replace blind spots and guesswork with robust, remotely managed monitoring for harsh environments."
-    items={[
-      {
-        title: 'Remote sites',
-        description: 'Monitoring and control for distributed, hard-to-reach locations.',
-        icon: 'tabler:antenna',
-      },
-      {
-        title: 'Energy telemetry',
-        description: 'Track real consumption, failures and trends across your portfolio.',
-        icon: 'tabler:bolt',
-      },
-      {
-        title: 'Infrastructure partners',
-        description: 'Built to integrate with towercos, utilities and infrastructure investors.',
-        icon: 'tabler:building-skyscraper',
-      },
-      {
-        title: 'Open data stack',
-        description: 'APIs and exports that play nicely with your existing tools.',
-        icon: 'tabler:database',
-      },
-      {
-        title: 'On-the-ground experience',
-        description: 'Designed from real deployments, not slide decks.',
-        icon: 'tabler:map',
-      },
-      {
-        title: 'Investor-grade visibility',
-        description: 'KPIs that matter for boardrooms and financing partners.',
-        icon: 'tabler:chart-line',
-      },
-    ]}
-  />
+        return (
+          <CallToAction
+            actions={
+              primaryLabel
+                ? [
+                    {
+                      variant: 'primary',
+                      text: primaryLabel,
+                      href: primaryHref,
+                      icon: 'tabler:mail',
+                    },
+                  ]
+                : []
+            }
+          >
+            <Fragment slot="title">
+              {title}
+            </Fragment>
 
-  <!-- The rest of the page can stay as-is for now -->
+            <Fragment slot="subtitle">
+              {subtitle}
+            </Fragment>
+          </CallToAction>
+        );
+      }
 
-  <Content
-    isReversed
-    tagline="Inside template"
-    title="AstroWind's Blueprint: Fun Meets Functionality!"
-    items={[
-      {
-        title: 'Built on top of Astro 5.0',
-        description:
-          'Benefiting from the performance and developer-friendly features of this modern static site generator.',
-      },
-      {
-        title: 'Styled using Tailwind CSS',
-        description:
-          'Facilitating rapid design and consistent styling with this highly popular utility-first CSS framework.',
-      },
-      {
-        title: 'Cross-browser compatibility',
-        description:
-          'Ensure your website looks and functions consistently across various web browsers, delivering a seamless experience to all users.',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      alt: 'Colorful Image',
-    }}
-  >
-    <Fragment slot="content">
-      <h3 class="text-2xl font-bold tracking-tight dark:text-white sm:text-3xl mb-2">
-        Building on modern foundations
-      </h3>
-      Gain a competitive advantage by incorporating industry leading practices
-    </Fragment>
-
-    <Fragment slot="bg">
-      <div class="absolute inset-0 bg-blue-50 dark:bg-transparent"></div>
-    </Fragment>
-  </Content>
-
-  <!-- (You can keep or later clean up the rest: Content blocks, Steps, FAQs, etc.) -->
-
-  <Steps
-    title="Get your infrastructure visibility up and running in no time."
-    items={[
-      {
-        title: 'Step 1: Assess',
-        description:
-          'We scope your sites, constraints and existing data flows.',
-        icon: 'tabler:map',
-      },
-      {
-        title: 'Step 2: Deploy',
-        description:
-          'Pilot hardware, connectivity and dashboards on a small cohort of sites.',
-        icon: 'tabler:rocket',
-      },
-      {
-        title: 'Step 3: Scale',
-        description:
-          'Roll out across more locations once the model is proven.',
-        icon: 'tabler:affiliate',
-      },
-      {
-        title: 'Ready!',
-        icon: 'tabler:check',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1616198814651-e71f960c3180?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=987&q=80',
-      alt: 'Steps image',
-    }}
-  />
-
-  <CallToAction
-    actions={[
-      {
-        variant: 'primary',
-        text: 'Talk to us',
-        href: '#contact',
-        icon: 'tabler:mail',
-      },
-    ]}
-  >
-    <Fragment slot="title">
-      Ready to see your sites clearly?
-    </Fragment>
-
-    <Fragment slot="subtitle">
-      We work with infrastructure operators and investors who need reliable visibility into field assets.
-    </Fragment>
-  </CallToAction>
+      default:
+        // Unknown layout_type: skip silently
+        return null;
+    }
+  })}
 </Layout>
